@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MOLDA · Planner de Encomendas</title>
+<style>
+:root{--bg:#faf6f1;--card:#fff;--tx:#2b2622;--mut:#7a6f66;--ac:#b5654a;--acx:#fff;--bd:#e8dfd5;--ok:#4d7c5a;--wa:#b7822b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1d1916;--card:#2a2420;--tx:#f1ebe4;--mut:#a89c91;--ac:#d98467;--acx:#1d1916;--bd:#3d342e;--ok:#7fb48c;--wa:#e0aa55}}
+:root[data-theme="dark"]{--bg:#1d1916;--card:#2a2420;--tx:#f1ebe4;--mut:#a89c91;--ac:#d98467;--acx:#1d1916;--bd:#3d342e;--ok:#7fb48c;--wa:#e0aa55}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.4}
+main{max-width:520px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:4px 0 12px}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.box{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px}
+.box small{color:var(--mut);display:block;font-size:12px}
+.box b{font-size:20px}
+form{display:grid;gap:8px;margin-bottom:16px}
+input,select{width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font-size:16px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
+.row>div{min-width:0}
+input[type=date]{display:block;width:100%;min-width:0;max-width:100%;min-height:46px;-webkit-appearance:none;appearance:none;color-scheme:light dark;text-align:left}
+input[type=date]:not(.has)::before{content:"Escolher data";color:var(--mut);position:absolute}
+input[type=date]:not(.has)::-webkit-datetime-edit{opacity:0}
+button{font:inherit;cursor:pointer}
+.add{background:var(--ac);color:var(--acx);border:0;border-radius:10px;padding:12px;font-weight:600}
+.tabs{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto}
+.tab{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:20px;padding:6px 12px;white-space:nowrap}
+.tab.on{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+.o{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin-bottom:10px}
+.o h3{margin:0;font-size:16px}
+.o p{margin:2px 0;color:var(--mut);font-size:14px}
+.top{display:flex;justify-content:space-between;gap:8px;align-items:start}
+.st{border:0;border-radius:20px;padding:5px 11px;font-size:13px;font-weight:600;color:#fff}
+.s0{background:var(--wa)}.s1{background:var(--ac)}.s2{background:var(--ok)}
+.del{background:none;border:0;color:var(--mut);font-size:13px;padding:6px 0}
+.late{color:#c0392b;font-weight:600}
+.empty{text-align:center;color:var(--mut);padding:24px}
+</style>
+</head>
+<body>
+<main>
+<h1>Planner de Encomendas</h1>
+<p style="margin:-6px 0 12px;color:var(--mut);font-size:14px">molda.atelier</p>
+<div class="sum">
+<div class="box"><small>Por receber</small><b id="falta">0,00 €</b></div>
+<div class="box"><small>Encomendas ativas</small><b id="ativas">0</b></div>
+</div>
+<form id="f">
+<input id="cli" placeholder="Cliente" required>
+<input id="peca" placeholder="Peça" required>
+<div class="row"><div><label for="prazo">Data limite de entrega</label><input id="prazo" type="date" required></div><div><label for="valor">Valor (€)</label><input id="valor" type="number" step="0.01" min="0" placeholder="0,00" required></div></div>
+<div class="row"><div><label for="sinal">Sinal pago (€)</label><input id="sinal" type="number" step="0.01" min="0" placeholder="0,00"></div><div><label for="est">Estado</label><select id="est"><option value="0">Por começar</option><option value="1">Em produção</option><option value="2">Entregue</option></select></div></div>
+<button class="add" type="submit">Adicionar encomenda</button>
+</form>
+<div class="tabs" id="tabs"></div>
+<div id="lista"></div>
+</main>
+<script>
+var KEY="molda_encomendas",NOMES=["Por começar","Em produção","Entregue"],dados=[],filtro="todas";
+try{dados=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){dados=[]}
+function guardar(){try{localStorage.setItem(KEY,JSON.stringify(dados))}catch(e){}}
+function eur(n){return n.toFixed(2).replace(".",",")+" €"}
+function fdata(d){var p=d.split("-");return p[2]+"/"+p[1]+"/"+p[0]}
+function esc(s){return s.replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function render(){
+var hoje=new Date().toISOString().slice(0,10),falta=0,ativas=0;
+dados.forEach(function(o){if(o.est<2){ativas++;falta+=Math.max(0,o.valor-o.sinal)}});
+document.getElementById("falta").textContent=eur(falta);
+document.getElementById("ativas").textContent=ativas;
+var t=document.getElementById("tabs");t.innerHTML="";
+["todas"].concat(NOMES).forEach(function(n,i){var b=document.createElement("button");b.className="tab"+((i==0&&filtro=="todas")||(i>0&&filtro==i-1)?" on":"");b.textContent=i==0?"Todas":n;b.onclick=function(){filtro=i==0?"todas":i-1;render()};t.appendChild(b)});
+var l=document.getElementById("lista");
+var v=dados.map(function(o,i){return{o:o,i:i}}).filter(function(x){return filtro=="todas"||x.o.est==filtro}).sort(function(a,b){return a.o.prazo<b.o.prazo?-1:1});
+if(!v.length){l.innerHTML='<div class="empty">Sem encomendas aqui.</div>';return}
+l.innerHTML=v.map(function(x){var o=x.o,atraso=o.est<2&&o.prazo<hoje;
+return '<div class="o"><div class="top"><div><h3>'+esc(o.cli)+'</h3><p>'+esc(o.peca)+'</p></div><button class="st s'+o.est+'" onclick="avancar('+x.i+')">'+NOMES[o.est]+'</button></div>'+
+'<p class="'+(atraso?"late":"")+'">Entrega até: '+fdata(o.prazo)+(atraso?" (atrasada)":"")+'</p>'+
+'<p>Valor '+eur(o.valor)+' · Sinal '+eur(o.sinal)+' · Falta '+eur(Math.max(0,o.valor-o.sinal))+'</p>'+
+'<button class="del" onclick="apagar('+x.i+')">Apagar</button></div>'}).join("");
+}
+function avancar(i){dados[i].est=(dados[i].est+1)%3;guardar();render()}
+function apagar(i){if(confirm("Apagar esta encomenda?")){dados.splice(i,1);guardar();render()}}
+document.getElementById("f").addEventListener("submit",function(e){
+e.preventDefault();
+dados.push({cli:cli.value.trim(),peca:peca.value.trim(),prazo:prazo.value,valor:parseFloat(valor.value)||0,sinal:parseFloat(sinal.value)||0,est:parseInt(est.value)});
+guardar();this.reset();marca();render();
+});
+function marca(){prazo.classList.toggle("has",!!prazo.value)}
+prazo.addEventListener("input",marca);prazo.addEventListener("change",marca);
+marca();render();
+</script>
+</body>
+</html>
